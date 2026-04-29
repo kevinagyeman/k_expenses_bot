@@ -92,6 +92,28 @@ def get_all_expenses() -> list:
     return [dict(r) for r in rows]
 
 
+def get_all_cycles() -> list:
+    with _conn() as con:
+        salaries = [dict(r) for r in con.execute(
+            "SELECT date, id FROM transactions WHERE type = 'salary' ORDER BY date ASC, id ASC"
+        ).fetchall()]
+        all_rows = [dict(r) for r in con.execute(
+            "SELECT * FROM transactions ORDER BY date ASC, id ASC"
+        ).fetchall()]
+
+    if not salaries:
+        return [{"start_date": None, "end_date": None, "transactions": all_rows}]
+
+    cycles = []
+    for i, salary in enumerate(salaries):
+        start = salary["date"]
+        end = salaries[i + 1]["date"] if i + 1 < len(salaries) else None
+        rows = [r for r in all_rows if r["date"] >= start and (end is None or r["date"] < end)]
+        cycles.append({"start_date": start, "end_date": end, "transactions": rows})
+
+    return cycles
+
+
 def get_current_cycle():
     with _conn() as con:
         last_income = con.execute(

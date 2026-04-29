@@ -49,9 +49,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(formatting.confirm_edit(updated), parse_mode=ParseMode.MARKDOWN)
 
 
-async def cmd_all_expenses(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rows = db.get_all_expenses()
-    await update.message.reply_text(formatting.all_expenses(rows), parse_mode=ParseMode.MARKDOWN)
+async def cmd_expenses(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    start_date, rows = db.get_current_cycle()
+    expense_rows = [r for r in rows if r["type"] == "expense"]
+    await update.message.reply_text(formatting.cycle_expenses(start_date, expense_rows), parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cycles = db.get_all_cycles()
+    await update.message.reply_text(formatting.all_cycles_summary(cycles), parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_month(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -28,10 +28,12 @@ def confirm_edit(row: dict) -> str:
     )
 
 
-def all_expenses(rows: list) -> str:
+def cycle_expenses(start_date: str | None, rows: list) -> str:
     if not rows:
-        return "No expenses yet."
-    lines = ["*All Expenses*\n"]
+        return "No expenses in the current cycle yet."
+    today = date_type.today().strftime("%d/%m/%y")
+    period = f"{_fmt_date(start_date)} → {today}" if start_date else today
+    lines = [f"*Expenses — {period}*\n"]
     for r in rows:
         lines.append(
             f"`{r['short_id']}` | {_fmt_amount(r['amount'])} | {r['category']} | {_fmt_date(r['date'])}"
@@ -63,6 +65,46 @@ def month_summary(start_date: str | None, rows: list) -> str:
     return "\n".join(lines)
 
 
+def all_cycles_summary(cycles: list) -> str:
+    if not cycles:
+        return "No data yet."
+
+    today = date_type.today().strftime("%d/%m/%y")
+    lines = ["*All Cycles*\n"]
+
+    total_income_all = 0.0
+    total_spent_all = 0.0
+
+    for i, cycle in enumerate(cycles):
+        rows = cycle["transactions"]
+        start = _fmt_date(cycle["start_date"]) if cycle["start_date"] else "start"
+        end = _fmt_date(cycle["end_date"]) if cycle["end_date"] else today
+
+        income = sum(r["amount"] for r in rows if r["type"] in ("salary", "income"))
+        spent = sum(r["amount"] for r in rows if r["type"] == "expense")
+        saved = income - spent
+        pct = (saved / income * 100) if income > 0 else 0.0
+
+        total_income_all += income
+        total_spent_all += spent
+
+        label = f"Cycle {i + 1}: {start} → {end}"
+        lines.append(f"*{label}*")
+        lines.append(f"  Income:  {_fmt_amount(income)}")
+        lines.append(f"  Spent:   {_fmt_amount(spent)}")
+        lines.append(f"  Saved:   {_fmt_amount(saved)} ({pct:.0f}%)")
+        lines.append("")
+
+    total_saved = total_income_all - total_spent_all
+    total_pct = (total_saved / total_income_all * 100) if total_income_all > 0 else 0.0
+    lines.append("*Overall*")
+    lines.append(f"  Income:  {_fmt_amount(total_income_all)}")
+    lines.append(f"  Spent:   {_fmt_amount(total_spent_all)}")
+    lines.append(f"  Saved:   {_fmt_amount(total_saved)} ({total_pct:.0f}%)")
+
+    return "\n".join(lines)
+
+
 GUIDE = """\
 *Expense Tracker — Guide*
 
@@ -82,7 +124,8 @@ GUIDE = """\
 `uhueYe delete` → remove it
 
 *Commands*
-/all\\-expenses — list all expenses
+/expenses — list expenses in current cycle
 /month — current salary cycle summary
+/all — summary of all cycles + overall total
 /guide — show this help
 """

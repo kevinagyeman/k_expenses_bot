@@ -141,6 +141,7 @@ GUIDE = """\
 
 *Add salary* (starts a new cycle)
 `salary:3333`
+A cycle runs from one salary to the next. Expenses, income and summaries are grouped by cycle.
 
 *Add extra income* (stays in current cycle)
 `+500`

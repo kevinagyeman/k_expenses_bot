@@ -2,27 +2,24 @@ import re
 
 SHORT_ID_RE = re.compile(r"^[A-Za-z0-9]{6}$")
 
-# salary: 3333  or  salary:3333
 _SALARY_RE = re.compile(r"^salary\s*:\s*(\d+(?:\.\d+)?)$", re.IGNORECASE)
-
-# +21  or  +21.50
 _INCOME_PLUS_RE = re.compile(r"^\+(\d+(?:\.\d+)?)$")
-
-# 33.44  (bare number)
 _EXPENSE_BARE_RE = re.compile(r"^(\d+(?:\.\d+)?)$")
 
-# hobby:23.78  (category:amount) — excludes reserved keywords
 _RESERVED = {"salary", "income"}
 _EXPENSE_CAT_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_]*)\s*:\s*(\d+(?:\.\d+)?)$")
 
-# uhueYe delete
+# e-ref patterns: e1 delete / e1 23 / e1 +23
+_E_DELETE_RE = re.compile(r"^e(\d+)\s+delete$", re.IGNORECASE)
+_E_AMOUNT_RE = re.compile(r"^e(\d+)\s+(\d+(?:\.\d+)?)$", re.IGNORECASE)
+_E_INCOME_RE = re.compile(r"^e(\d+)\s+\+(\d+(?:\.\d+)?)$", re.IGNORECASE)
+
+# legacy short_id patterns kept for backward compat
 _EDIT_DELETE_RE = re.compile(r"^([A-Za-z0-9]{6})\s+delete$", re.IGNORECASE)
-
-# uhueYe 23  (edit amount → expense)
 _EDIT_AMOUNT_RE = re.compile(r"^([A-Za-z0-9]{6})\s+(\d+(?:\.\d+)?)$")
-
-# uhueYe +12  (edit → income)
 _EDIT_INCOME_RE = re.compile(r"^([A-Za-z0-9]{6})\s+\+(\d+(?:\.\d+)?)$")
+
+_DELETE_LAST_RE = re.compile(r"^delete$", re.IGNORECASE)
 
 
 def parse_message(text: str) -> dict | None:
@@ -35,6 +32,21 @@ def parse_message(text: str) -> dict | None:
     m = _INCOME_PLUS_RE.match(text)
     if m:
         return {"action": "add", "type": "income", "amount": float(m.group(1)), "category": "income"}
+
+    if _DELETE_LAST_RE.match(text):
+        return {"action": "delete_last"}
+
+    m = _E_DELETE_RE.match(text)
+    if m:
+        return {"action": "delete", "cycle_seq": int(m.group(1))}
+
+    m = _E_INCOME_RE.match(text)
+    if m:
+        return {"action": "edit", "cycle_seq": int(m.group(1)), "amount": float(m.group(2)), "type": "income"}
+
+    m = _E_AMOUNT_RE.match(text)
+    if m:
+        return {"action": "edit", "cycle_seq": int(m.group(1)), "amount": float(m.group(2)), "type": "expense"}
 
     m = _EDIT_DELETE_RE.match(text)
     if m:

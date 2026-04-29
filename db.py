@@ -25,6 +25,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS transactions (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 short_id   TEXT UNIQUE NOT NULL,
+                user_id    INTEGER NOT NULL DEFAULT 0,
+                cycle_seq  INTEGER,
                 type       TEXT NOT NULL,
                 amount     REAL NOT NULL,
                 category   TEXT NOT NULL DEFAULT 'general',
@@ -32,6 +34,14 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        for col, definition in [
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("cycle_seq", "INTEGER"),
+        ]:
+            try:
+                con.execute(f"ALTER TABLE transactions ADD COLUMN {col} {definition}")
+            except Exception:
+                pass
 
 
 def _make_short_id(con) -> str:
@@ -42,63 +52,96 @@ def _make_short_id(con) -> str:
             return sid
 
 
-def add_transaction(type_: str, amount: float, category: str = "general", date: str = None) -> str:
+def _next_cycle_seq(con, user_id: int, is_salary: bool) -> int:
+    if is_salary:
+        return 1
+    last_salary = con.execute(
+        "SELECT id FROM transactions WHERE type = 'salary' AND user_id = ? ORDER BY id DESC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    cycle_start_id = last_salary["id"] if last_salary else 0
+    row = con.execute(
+        "SELECT COALESCE(MAX(cycle_seq), 0) + 1 FROM transactions WHERE user_id = ? AND id >= ?",
+        (user_id, cycle_start_id),
+    ).fetchone()
+    return row[0]
+
+
+def add_transaction(user_id: int, type_: str, amount: float, category: str = "general", date: str = None) -> tuple[str, int]:
     if date is None:
         date = date_type.today().isoformat()
     with _conn() as con:
+        cycle_seq = _next_cycle_seq(con, user_id, type_ == "salary")
         sid = _make_short_id(con)
         con.execute(
-            "INSERT INTO transactions (short_id, type, amount, category, date) VALUES (?, ?, ?, ?, ?)",
-            (sid, type_, amount, category, date),
+            "INSERT INTO transactions (short_id, user_id, cycle_seq, type, amount, category, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (sid, user_id, cycle_seq, type_, amount, category, date),
         )
-    return sid
+    return sid, cycle_seq
 
 
-def get_transaction(short_id: str):
+def get_transaction_by_seq(user_id: int, cycle_seq: int):
     with _conn() as con:
+        last_salary = con.execute(
+            "SELECT id FROM transactions WHERE type = 'salary' AND user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        cycle_start_id = last_salary["id"] if last_salary else 0
         return con.execute(
-            "SELECT * FROM transactions WHERE short_id = ?", (short_id,)
+            "SELECT * FROM transactions WHERE user_id = ? AND cycle_seq = ? AND id >= ?",
+            (user_id, cycle_seq, cycle_start_id),
         ).fetchone()
 
 
-def update_transaction(short_id: str, amount: float, type_: str, category: str = None) -> bool:
+def delete_last_transaction(user_id: int) -> dict | None:
+    with _conn() as con:
+        row = con.execute(
+            "SELECT * FROM transactions WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return None
+        con.execute("DELETE FROM transactions WHERE id = ?", (row["id"],))
+    return dict(row)
+
+
+def get_transaction(user_id: int, short_id: str):
+    with _conn() as con:
+        return con.execute(
+            "SELECT * FROM transactions WHERE short_id = ? AND user_id = ?", (short_id, user_id)
+        ).fetchone()
+
+
+def update_transaction(user_id: int, short_id: str, amount: float, type_: str, category: str = None) -> bool:
     with _conn() as con:
         if category is not None:
             con.execute(
-                "UPDATE transactions SET amount = ?, type = ?, category = ? WHERE short_id = ?",
-                (amount, type_, category, short_id),
+                "UPDATE transactions SET amount = ?, type = ?, category = ? WHERE short_id = ? AND user_id = ?",
+                (amount, type_, category, short_id, user_id),
             )
         else:
             con.execute(
-                "UPDATE transactions SET amount = ?, type = ? WHERE short_id = ?",
-                (amount, type_, short_id),
+                "UPDATE transactions SET amount = ?, type = ? WHERE short_id = ? AND user_id = ?",
+                (amount, type_, short_id, user_id),
             )
-        return con.execute(
-            "SELECT changes()"
-        ).fetchone()[0] > 0
-
-
-def delete_transaction(short_id: str) -> bool:
-    with _conn() as con:
-        con.execute("DELETE FROM transactions WHERE short_id = ?", (short_id,))
         return con.execute("SELECT changes()").fetchone()[0] > 0
 
 
-def get_all_expenses() -> list:
+def delete_transaction(user_id: int, short_id: str) -> bool:
     with _conn() as con:
-        rows = con.execute(
-            "SELECT * FROM transactions WHERE type = 'expense' ORDER BY date DESC, id DESC"
-        ).fetchall()
-    return [dict(r) for r in rows]
+        con.execute("DELETE FROM transactions WHERE short_id = ? AND user_id = ?", (short_id, user_id))
+        return con.execute("SELECT changes()").fetchone()[0] > 0
 
 
-def get_all_cycles() -> list:
+def get_all_cycles(user_id: int) -> list:
     with _conn() as con:
         salaries = [dict(r) for r in con.execute(
-            "SELECT date, id FROM transactions WHERE type = 'salary' ORDER BY date ASC, id ASC"
+            "SELECT date, id FROM transactions WHERE type = 'salary' AND user_id = ? ORDER BY date ASC, id ASC",
+            (user_id,),
         ).fetchall()]
         all_rows = [dict(r) for r in con.execute(
-            "SELECT * FROM transactions ORDER BY date ASC, id ASC"
+            "SELECT * FROM transactions WHERE user_id = ? ORDER BY date ASC, id ASC",
+            (user_id,),
         ).fetchall()]
 
     if not salaries:
@@ -114,22 +157,24 @@ def get_all_cycles() -> list:
     return cycles
 
 
-def get_current_cycle():
+def get_current_cycle(user_id: int):
     with _conn() as con:
         last_income = con.execute(
-            "SELECT date FROM transactions WHERE type = 'salary' ORDER BY date DESC, id DESC LIMIT 1"
+            "SELECT date FROM transactions WHERE type = 'salary' AND user_id = ? ORDER BY date DESC, id DESC LIMIT 1",
+            (user_id,),
         ).fetchone()
 
         if last_income:
             start_date = last_income["date"]
             rows = con.execute(
-                "SELECT * FROM transactions WHERE date >= ? ORDER BY date ASC, id ASC",
-                (start_date,),
+                "SELECT * FROM transactions WHERE date >= ? AND user_id = ? ORDER BY date ASC, id ASC",
+                (start_date, user_id),
             ).fetchall()
         else:
             start_date = None
             rows = con.execute(
-                "SELECT * FROM transactions ORDER BY date ASC, id ASC"
+                "SELECT * FROM transactions WHERE user_id = ? ORDER BY date ASC, id ASC",
+                (user_id,),
             ).fetchall()
 
     return start_date, [dict(r) for r in rows]

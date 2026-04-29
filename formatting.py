@@ -11,12 +11,33 @@ def _fmt_amount(amount: float) -> str:
     return f"{amount:.2f}"
 
 
-def confirm_add(type_: str, amount: float, category: str, short_id: str, date: str) -> str:
+def _ref(row: dict) -> str:
+    return f"e{row['cycle_seq']}" if row.get("cycle_seq") else row["short_id"]
+
+
+def confirm_add(type_: str, amount: float, category: str, cycle_seq: int, date: str) -> str:
+    ref = f"e{cycle_seq}"
     if type_ == "salary":
-        return f"Salary added — new cycle started\n+{_fmt_amount(amount)} | {_fmt_date(date)} | `{short_id}`"
+        return f"Salary added — new cycle started\n+{_fmt_amount(amount)} | {_fmt_date(date)} | `{ref}`"
     if type_ == "income":
-        return f"Income added\n+{_fmt_amount(amount)} | {_fmt_date(date)} | `{short_id}`"
-    return f"Expense added\n-{_fmt_amount(amount)} | {category} | {_fmt_date(date)} | `{short_id}`"
+        return f"Income added\n+{_fmt_amount(amount)} | {_fmt_date(date)} | `{ref}`"
+    return f"Expense added\n-{_fmt_amount(amount)} | {category} | {_fmt_date(date)} | `{ref}`"
+
+
+def batch_confirm(items: list[dict]) -> str:
+    lines = [f"*{len(items)} items processed*\n"]
+    for it in items:
+        ref = it["ref"]
+        action = it["action"]
+        if action == "add":
+            sign = "+" if it["type"] in ("salary", "income") else "-"
+            lines.append(f"`{ref}` {sign}{_fmt_amount(it['amount'])} | {it['category']}")
+        elif action == "delete":
+            lines.append(f"`{ref}` deleted")
+        elif action == "edit":
+            sign = "+" if it["type"] in ("salary", "income") else "-"
+            lines.append(f"`{ref}` updated → {sign}{_fmt_amount(it['amount'])} | {it['category']}")
+    return "\n".join(lines)
 
 
 def confirm_edit(row: dict) -> str:
@@ -24,7 +45,7 @@ def confirm_edit(row: dict) -> str:
     return (
         f"Updated\n"
         f"{sign}{_fmt_amount(row['amount'])} | {row['category']} | "
-        f"{_fmt_date(row['date'])} | `{row['short_id']}`"
+        f"{_fmt_date(row['date'])} | `{_ref(row)}`"
     )
 
 
@@ -36,7 +57,7 @@ def cycle_expenses(start_date: str | None, rows: list) -> str:
     lines = [f"*Expenses — {period}*\n"]
     for r in rows:
         lines.append(
-            f"`{r['short_id']}` | {_fmt_amount(r['amount'])} | {r['category']} | {_fmt_date(r['date'])}"
+            f"`{_ref(r)}` | {_fmt_amount(r['amount'])} | {r['category']} | {_fmt_date(r['date'])}"
         )
     return "\n".join(lines)
 

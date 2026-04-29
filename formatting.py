@@ -77,13 +77,15 @@ def month_summary(start_date: str | None, rows: list) -> str:
     saved = total_income - total_expenses
     pct = (saved / total_income * 100) if total_income > 0 else 0.0
 
-    lines = [f"*Cycle: {period}*\n"]
-    lines.append(f"Income:    {_fmt_amount(total_income)}")
-    lines.append(f"Expenses:  {_fmt_amount(total_expenses)}")
-    for cat, amt in sorted(expenses_by_cat.items()):
-        lines.append(f"  {cat}: {_fmt_amount(amt)}")
+    lines = [f"*Cycle: {period}*"]
     lines.append("")
-    lines.append(f"Saved: {_fmt_amount(saved)} ({pct:.0f}%)")
+    lines.append(f"💰 Income: {_fmt_amount(total_income)}")
+    lines.append("")
+    lines.append(f"💸 Expenses: {_fmt_amount(total_expenses)}")
+    for cat, amt in sorted(expenses_by_cat.items()):
+        lines.append(f"  • {cat}: {_fmt_amount(amt)}")
+    lines.append("")
+    lines.append(f"💵 Saved: {_fmt_amount(saved)} ({pct:.0f}%)")
     return "\n".join(lines)
 
 

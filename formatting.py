@@ -33,7 +33,8 @@ def batch_confirm(items: list[dict]) -> str:
             sign = "+" if it["type"] in ("salary", "income") else "-"
             lines.append(f"`{ref}` {sign}{_fmt_amount(it['amount'])} | {it['category']}")
         elif action == "delete":
-            lines.append(f"`{ref}` deleted")
+            sign = "+" if it["type"] in ("salary", "income") else "-"
+            lines.append(f"`{ref}` {sign}{_fmt_amount(it['amount'])} | {it['category']} deleted")
         elif action == "edit":
             sign = "+" if it["type"] in ("salary", "income") else "-"
             lines.append(f"`{ref}` updated → {sign}{_fmt_amount(it['amount'])} | {it['category']}")
@@ -131,7 +132,12 @@ GUIDE = """\
 
 *Add expense*
 `33.44` → general category
-`hobby:23.78` → specific category
+`food:23.78` → specific category (case-insensitive)
+
+*Add multiple at once* (one per line)
+`33.44`
+`food:12`
+`+50`
 
 *Add salary* (starts a new cycle)
 `salary:3333`
@@ -139,14 +145,22 @@ GUIDE = """\
 *Add extra income* (stays in current cycle)
 `+500`
 
-*Edit a transaction* (use the ID shown after each entry)
-`uhueYe 45` → change amount to 45 (expense)
-`uhueYe +45` → change to income of 45
-`uhueYe delete` → remove it
+*Edit a transaction* (use the number shown in /expenses)
+`e2 45` → change amount to 45 (expense)
+`e2 +45` → change to income of 45
+
+*Delete a transaction*
+`e2 delete` → delete by number
+`delete` → delete the last added transaction
+
+*Batch edit/delete* (one per line)
+`e1 delete`
+`e2 delete`
+`e3 45`
 
 *Commands*
 /expenses — list expenses in current cycle
-/month — current salary cycle summary
-/all — summary of all cycles + overall total
+/month — current cycle summary
+/all — summary of all cycles
 /guide — show this help
 """

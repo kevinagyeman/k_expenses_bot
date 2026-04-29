@@ -56,7 +56,11 @@ async def _handle_single(update: Update, user_id: int, parsed: dict):
         row = db.delete_last_transaction(user_id)
         if row:
             ref = f"e{row['cycle_seq']}" if row.get("cycle_seq") else row["short_id"]
-            await update.message.reply_text(f"`{ref}` deleted.", parse_mode=ParseMode.MARKDOWN)
+            sign = "+" if row["type"] in ("salary", "income") else "-"
+            await update.message.reply_text(
+                f"`{ref}` {sign}{row['amount']:.2f} | {row['category']} deleted.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
         else:
             await update.message.reply_text("Nothing to delete.", parse_mode=ParseMode.MARKDOWN)
 
@@ -64,7 +68,11 @@ async def _handle_single(update: Update, user_id: int, parsed: dict):
         row, ref = _resolve_ref(user_id, parsed)
         if row:
             db.delete_transaction(user_id, row["short_id"])
-            await update.message.reply_text(f"`{ref}` deleted.", parse_mode=ParseMode.MARKDOWN)
+            sign = "+" if row["type"] in ("salary", "income") else "-"
+            await update.message.reply_text(
+                f"`{ref}` {sign}{row['amount']:.2f} | {row['category']} deleted.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
         else:
             await update.message.reply_text(f"`{ref}` not found.", parse_mode=ParseMode.MARKDOWN)
 
@@ -106,7 +114,7 @@ async def _handle_batch(update: Update, user_id: int, parsed_list: list[dict]):
             row, ref = _resolve_ref(user_id, parsed)
             if row:
                 db.delete_transaction(user_id, row["short_id"])
-                results.append({"action": "delete", "ref": ref})
+                results.append({"action": "delete", "ref": ref, "type": row["type"], "amount": row["amount"], "category": row["category"]})
 
         elif action == "edit":
             row, ref = _resolve_ref(user_id, parsed)
@@ -156,7 +164,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`42.50` — add expense\n"
         "`food:15` — add categorised expense\n"
         "`salary:3000` — add salary (starts new cycle)\n"
-        "`+50` — add extra income\n\n"
+        "`+50` — add extra income\n"
+        "`e2 delete` — delete expense #2\n"
+        "`delete` — delete last added\n\n"
         "Type /guide for full help.",
         parse_mode=ParseMode.MARKDOWN,
     )

@@ -1,10 +1,11 @@
+import os
 import sqlite3
 import random
 import string
 from datetime import date as date_type
 from contextlib import contextmanager
 
-DB_PATH = "expenses.db"
+DB_PATH = os.environ.get("DB_PATH", "expenses.db")
 
 
 @contextmanager

@@ -1,0 +1,19 @@
+services:
+  bot:
+    build: .
+    container_name: expenses-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - expenses-data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+
+volumes:
+  expenses-data:

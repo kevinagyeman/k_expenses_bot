@@ -12,13 +12,15 @@ def _fmt_amount(amount: float) -> str:
 
 
 def confirm_add(type_: str, amount: float, category: str, short_id: str, date: str) -> str:
+    if type_ == "salary":
+        return f"Salary added — new cycle started\n+{_fmt_amount(amount)} | {_fmt_date(date)} | `{short_id}`"
     if type_ == "income":
         return f"Income added\n+{_fmt_amount(amount)} | {_fmt_date(date)} | `{short_id}`"
     return f"Expense added\n-{_fmt_amount(amount)} | {category} | {_fmt_date(date)} | `{short_id}`"
 
 
 def confirm_edit(row: dict) -> str:
-    sign = "+" if row["type"] == "income" else "-"
+    sign = "+" if row["type"] in ("income", "salary") else "-"
     return (
         f"Updated\n"
         f"{sign}{_fmt_amount(row['amount'])} | {row['category']} | "
@@ -41,7 +43,7 @@ def month_summary(start_date: str | None, rows: list) -> str:
     today = date_type.today().strftime("%d/%m/%y")
     period = f"{_fmt_date(start_date)} → {today}" if start_date else f"All time → {today}"
 
-    total_income = sum(r["amount"] for r in rows if r["type"] == "income")
+    total_income = sum(r["amount"] for r in rows if r["type"] in ("salary", "income"))
     expenses_by_cat: dict[str, float] = defaultdict(float)
     for r in rows:
         if r["type"] == "expense":
@@ -68,8 +70,11 @@ GUIDE = """\
 `33.44` → general category
 `hobby:23.78` → specific category
 
-*Add income*
-`income:3333` or `+500`
+*Add salary* (starts a new cycle)
+`salary:3333`
+
+*Add extra income* (stays in current cycle)
+`+500`
 
 *Edit a transaction* (use the ID shown after each entry)
 `uhueYe 45` → change amount to 45 (expense)

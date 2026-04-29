@@ -43,7 +43,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"ID `{parsed['short_id']}` not found.", parse_mode=ParseMode.MARKDOWN
             )
             return
-        category = row["category"] if parsed["type"] == "expense" else "income"
+        category = row["category"] if parsed["type"] == "expense" else parsed["type"]
         db.update_transaction(parsed["short_id"], parsed["amount"], parsed["type"], category)
         updated = dict(db.get_transaction(parsed["short_id"]))
         await update.message.reply_text(formatting.confirm_edit(updated), parse_mode=ParseMode.MARKDOWN)
@@ -69,7 +69,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Quick start:\n"
         "`42.50` — add expense\n"
         "`food:15` — add categorised expense\n"
-        "`income:3000` or `+3000` — add income\n\n"
+        "`salary:3000` — add salary (starts new cycle)\n"
+        "`+50` — add extra income\n\n"
         "Type /guide for full help.",
         parse_mode=ParseMode.MARKDOWN,
     )

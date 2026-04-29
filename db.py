@@ -24,7 +24,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS transactions (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 short_id   TEXT UNIQUE NOT NULL,
-                type       TEXT NOT NULL CHECK(type IN ('income', 'expense')),
+                type       TEXT NOT NULL,
                 amount     REAL NOT NULL,
                 category   TEXT NOT NULL DEFAULT 'general',
                 date       TEXT NOT NULL,
@@ -94,7 +94,7 @@ def get_all_expenses() -> list:
 def get_current_cycle():
     with _conn() as con:
         last_income = con.execute(
-            "SELECT date FROM transactions WHERE type = 'income' ORDER BY date DESC, id DESC LIMIT 1"
+            "SELECT date FROM transactions WHERE type = 'salary' ORDER BY date DESC, id DESC LIMIT 1"
         ).fetchone()
 
         if last_income:

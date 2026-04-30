@@ -3,6 +3,8 @@ from datetime import date as date_type
 
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
+from telegram import Bot
+from telegram.constants import ParseMode
 
 import db
 import formatting
@@ -43,6 +45,15 @@ async def add(body: AddRequest, authorization: str = Header(None)):
         category=parsed.get("category", "general"),
         date=today,
     )
+
+    reply = formatting.confirm_add(
+        parsed["type"], parsed["amount"], parsed.get("category", "general"), cycle_seq, today
+    )
+    bot_token = os.environ.get("BOT_TOKEN")
+    if bot_token:
+        async with Bot(token=bot_token) as bot:
+            await bot.send_message(chat_id=user_id, text=reply, parse_mode=ParseMode.MARKDOWN)
+
     return {
         "ref": f"e{cycle_seq}",
         "type": parsed["type"],
